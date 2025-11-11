@@ -15,6 +15,7 @@ const CONFIG = {
   NUM_MESAS: 150,
   ITEMS_POR_ORDEN_MIN: 2,
   ITEMS_POR_ORDEN_MAX: 8,
+  AUTO_CLEAN: process.env.AUTO_CLEAN !== 'false', // Por defecto limpia órdenes anteriores
 };
 
 // ============== DATOS DE SEED ==============
@@ -161,17 +162,28 @@ async function seedData() {
 
     console.log(`✅ Usuario mesero encontrado: ${mesero.nombre} (ID: ${mesero.id})\n`);
 
-    // 2. Limpiar datos anteriores de pruebas (opcional)
-    console.log('🧹 Limpiando datos de pruebas anteriores...');
+    // 2. Limpiar datos anteriores de pruebas (configurable)
+    if (CONFIG.AUTO_CLEAN) {
+      console.log('🧹 Limpiando datos de pruebas anteriores...');
 
-    // Eliminar órdenes sin ticket (de pruebas)
-    const ordenesEliminadas = await prisma.orden.deleteMany({
-      where: {
-        mesero: { usuario: 'mesero1' },
-        tickets: { none: {} },
-      },
-    });
-    console.log(`   - ${ordenesEliminadas.count} órdenes de prueba eliminadas`);
+      // Eliminar órdenes sin ticket (de pruebas)
+      const ordenesEliminadas = await prisma.orden.deleteMany({
+        where: {
+          mesero: { usuario: 'mesero1' },
+          tickets: { none: {} },
+        },
+      });
+      console.log(`   - ${ordenesEliminadas.count} órdenes de prueba eliminadas`);
+
+      // Liberar todas las mesas ocupadas
+      const mesasLiberadas = await prisma.mesa.updateMany({
+        where: { estado: 'OCUPADA' },
+        data: { estado: 'DISPONIBLE' },
+      });
+      console.log(`   - ${mesasLiberadas.count} mesas liberadas`);
+    } else {
+      console.log('⏩ Omitiendo limpieza automática (AUTO_CLEAN=false)\n');
+    }
 
     // 3. Crear Categorías
     console.log('\n📁 Creando categorías...');

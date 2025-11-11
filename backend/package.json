@@ -14,7 +14,9 @@
     "stress-test:small": "NUM_ORDENES=10 node stress-test.js",
     "stress-test:medium": "NUM_ORDENES=100 node stress-test.js",
     "stress-test:large": "NUM_ORDENES=500 node stress-test.js",
-    "stress-test:extreme": "NUM_ORDENES=2000 node stress-test.js"
+    "stress-test:extreme": "NUM_ORDENES=2000 node stress-test.js",
+    "clean": "node clean-test-data.js",
+    "reset": "node reset-test-database.js"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
