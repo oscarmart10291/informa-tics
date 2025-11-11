@@ -15,6 +15,11 @@
     "stress-test:medium": "NUM_ORDENES=100 node stress-test.js",
     "stress-test:large": "NUM_ORDENES=500 node stress-test.js",
     "stress-test:extreme": "NUM_ORDENES=2000 node stress-test.js",
+    "stress-test:full": "node stress-test-full-flow.js",
+    "stress-test:full:small": "NUM_ORDENES=10 node stress-test-full-flow.js",
+    "stress-test:full:medium": "NUM_ORDENES=100 node stress-test-full-flow.js",
+    "stress-test:full:large": "NUM_ORDENES=500 node stress-test-full-flow.js",
+    "stress-test:full:with-prep": "SIMULATE_PREP_TIME=true NUM_ORDENES=10 node stress-test-full-flow.js",
     "clean": "node clean-test-data.js",
     "reset": "node reset-test-database.js"
   },
