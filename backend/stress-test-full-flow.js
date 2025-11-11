@@ -298,7 +298,7 @@ async function procesarOrdenCompleta(mesaNum, meseroId, cocineroId, bartenderId,
     });
     timings.crear = Date.now() - createStart;
 
-    const orden = ordenResponse.data;
+    const orden = ordenResponse.data.orden; // La respuesta tiene estructura { mensaje, orden }
     const ordenId = orden.id;
 
     // Simular pequeño delay si está configurado
@@ -587,7 +587,7 @@ async function stressTest(meseroId, cocineroId, bartenderId, cajeroId, platillos
 
   const ticketsCreados = await prisma.ticketVenta.count({
     where: {
-      creadoEn: { gte: new Date(startTime) },
+      fechaPago: { gte: new Date(startTime) },
     },
   });
 
