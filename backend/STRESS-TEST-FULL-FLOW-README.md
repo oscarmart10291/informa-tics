@@ -27,7 +27,16 @@ A diferencia del `stress-test.js` básico que solo **crea órdenes**, este scrip
 npm run stress-test:full:small    # 10 órdenes completas (EMPIEZA AQUÍ)
 npm run stress-test:full:medium   # 100 órdenes completas
 npm run stress-test:full:large    # 500 órdenes completas
-npm run stress-test:full          # 1000 órdenes completas
+npm run stress-test:full          # 1000 órdenes completas (50 concurrentes)
+```
+
+### Pruebas con control de concurrencia (batching):
+```bash
+# 1000 órdenes con diferentes tamaños de lote
+npm run stress-test:full:batch-10    # Lotes de 10 (más seguro, más lento)
+npm run stress-test:full:batch-25    # Lotes de 25 (balance)
+npm run stress-test:full              # Lotes de 50 (default)
+npm run stress-test:full:batch-100   # Lotes de 100 (más rápido, más race conditions)
 ```
 
 ### Prueba con simulación de tiempo de preparación:
@@ -37,8 +46,8 @@ npm run stress-test:full:with-prep    # 10 órdenes con delays realistas
 
 ### Personalizado:
 ```bash
-# Cambiar número de órdenes
-NUM_ORDENES=50 node stress-test-full-flow.js
+# Cambiar número de órdenes y tamaño de lote
+NUM_ORDENES=500 BATCH_SIZE=25 node stress-test-full-flow.js
 
 # Con simulación de tiempo de preparación
 SIMULATE_PREP_TIME=true NUM_ORDENES=20 node stress-test-full-flow.js
@@ -225,6 +234,9 @@ Tasa de completitud = (Órdenes PAGADAS / Órdenes Creadas) × 100%
 # Número de órdenes (default: 1000)
 NUM_ORDENES=100
 
+# Tamaño de lote - órdenes concurrentes por batch (default: 50)
+BATCH_SIZE=25
+
 # URL del API (default: http://localhost:3001)
 API_URL=http://localhost:4000
 
@@ -237,8 +249,59 @@ AUTO_CLEAN=false
 
 ### Ejemplo combinado
 ```bash
-NUM_ORDENES=50 SIMULATE_PREP_TIME=true API_URL=http://localhost:3001 node stress-test-full-flow.js
+NUM_ORDENES=500 BATCH_SIZE=25 SIMULATE_PREP_TIME=true node stress-test-full-flow.js
 ```
+
+## 🎯 Sistema de Batching (Control de Concurrencia)
+
+### ¿Qué es el batching?
+
+El sistema procesa órdenes **en lotes** en lugar de lanzar todas simultáneamente:
+
+**Sin batching (problema):**
+```
+1000 requests → API simultáneos → Race conditions → Alta tasa de fallos
+```
+
+**Con batching (solución):**
+```
+Lote 1: 50 órdenes → Espera → Lote 2: 50 órdenes → Espera → ...
+```
+
+### ¿Por qué es necesario?
+
+**Problemas sin batching:**
+- ❌ Race conditions en mesas (múltiples órdenes intentan tomar la misma mesa)
+- ❌ Locks en base de datos por alta concurrencia
+- ❌ Timeouts por sobrecarga del servidor
+- ❌ Fallos en cocina/barra por conflictos de estado
+
+**Beneficios del batching:**
+- ✅ Reduce race conditions controlando concurrencia
+- ✅ Evita saturar el connection pool de la BD
+- ✅ Mayor tasa de éxito en pruebas de carga
+- ✅ Más cercano a uso real (no hay 1000 meseros simultáneos)
+
+### Cómo elegir el tamaño de lote
+
+| BATCH_SIZE | Uso recomendado | Pros | Contras |
+|------------|----------------|------|---------|
+| **10** | Debugging, sistemas limitados | Muy seguro, pocos fallos | Muy lento |
+| **25** | Testing normal, CI/CD | Buen balance | Moderadamente lento |
+| **50** | Default, pruebas realistas | Balance óptimo | Algunos fallos posibles |
+| **100** | Stress máximo | Rápido | Más race conditions |
+
+### Ejemplo de resultados
+
+**Sin batching (1000 simultáneas):**
+- Tasa de éxito: 3.1%
+- Órdenes creadas: 327/1000
+- Principal error: "Mesa ocupada" (race condition)
+
+**Con batching (lotes de 50):**
+- Tasa de éxito esperada: 90-100%
+- Órdenes creadas: 950-1000/1000
+- Errores ocasionales en picos de carga
 
 ## 🧹 Limpieza de datos
 

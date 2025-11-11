@@ -17,6 +17,7 @@ const CONFIG = {
   ITEMS_POR_ORDEN_MAX: 8,
   AUTO_CLEAN: process.env.AUTO_CLEAN !== 'false',
   SIMULATE_PREP_TIME: process.env.SIMULATE_PREP_TIME === 'true', // Simular tiempo de preparación
+  BATCH_SIZE: parseInt(process.env.BATCH_SIZE) || 50, // Órdenes concurrentes por lote
 };
 
 // ============== DATOS DE SEED (igual que stress-test.js) ==============
@@ -479,6 +480,7 @@ async function stressTest(meseroId, cocineroId, bartenderId, cajeroId, platillos
   console.log('\n🔥 FASE 2: Iniciando prueba de carga masiva con FLUJO COMPLETO...\n');
   console.log(`📊 Configuración:`);
   console.log(`   - Órdenes a procesar: ${CONFIG.NUM_ORDENES}`);
+  console.log(`   - Tamaño de lote (concurrencia): ${CONFIG.BATCH_SIZE}`);
   console.log(`   - Flujo: Crear → Cocina/Barra → Finalizar → Cobrar`);
   console.log(`   - Simular tiempos de prep: ${CONFIG.SIMULATE_PREP_TIME ? 'SÍ' : 'NO'}`);
   console.log(`   - API URL: ${CONFIG.API_URL}`);
@@ -509,49 +511,56 @@ async function stressTest(meseroId, cocineroId, bartenderId, cajeroId, platillos
     },
   };
 
-  console.log('🚀 Lanzando órdenes concurrentes...\n');
+  console.log(`🚀 Procesando órdenes en lotes de ${CONFIG.BATCH_SIZE}...\n`);
 
-  // Crear todas las órdenes concurrentemente
-  for (let i = 0; i < CONFIG.NUM_ORDENES; i++) {
-    const mesaNum = (i % mesas.length) + 1;
+  // Procesar órdenes por lotes para evitar race conditions
+  const totalBatches = Math.ceil(CONFIG.NUM_ORDENES / CONFIG.BATCH_SIZE);
 
-    const promise = procesarOrdenCompleta(mesaNum, meseroId, cocineroId, bartenderId, cajeroId, platillos)
-      .then(result => {
-        if (result.success) {
-          results.success++;
-          results.durations.push(result.duration);
+  for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+    const batchStart = batchIndex * CONFIG.BATCH_SIZE;
+    const batchEnd = Math.min(batchStart + CONFIG.BATCH_SIZE, CONFIG.NUM_ORDENES);
+    const batchPromises = [];
 
-          // Agregar timings por paso
-          Object.keys(result.timings).forEach(step => {
-            if (results.timingsByStep[step]) {
-              results.timingsByStep[step].push(result.timings[step]);
-            }
-          });
-        } else {
+    // Crear promesas para este lote
+    for (let i = batchStart; i < batchEnd; i++) {
+      const mesaNum = (i % mesas.length) + 1;
+
+      const promise = procesarOrdenCompleta(mesaNum, meseroId, cocineroId, bartenderId, cajeroId, platillos)
+        .then(result => {
+          if (result.success) {
+            results.success++;
+            results.durations.push(result.duration);
+
+            // Agregar timings por paso
+            Object.keys(result.timings).forEach(step => {
+              if (results.timingsByStep[step]) {
+                results.timingsByStep[step].push(result.timings[step]);
+              }
+            });
+          } else {
+            results.failed++;
+            const errorKey = result.error || 'Unknown error';
+            results.errors[errorKey] = (results.errors[errorKey] || 0) + 1;
+          }
+
+          return result;
+        })
+        .catch(error => {
           results.failed++;
-          const errorKey = result.error || 'Unknown error';
+          const errorKey = 'Network/Timeout error';
           results.errors[errorKey] = (results.errors[errorKey] || 0) + 1;
-        }
+        });
 
-        // Mostrar progreso
-        const total = results.success + results.failed;
-        if (total % 50 === 0 || total === CONFIG.NUM_ORDENES) {
-          console.log(createProgressBar(total, CONFIG.NUM_ORDENES));
-        }
+      batchPromises.push(promise);
+    }
 
-        return result;
-      })
-      .catch(error => {
-        results.failed++;
-        const errorKey = 'Network/Timeout error';
-        results.errors[errorKey] = (results.errors[errorKey] || 0) + 1;
-      });
+    // Esperar a que termine el lote actual antes de lanzar el siguiente
+    await Promise.allSettled(batchPromises);
 
-    promises.push(promise);
+    // Mostrar progreso después de cada lote
+    const total = results.success + results.failed;
+    console.log(createProgressBar(total, CONFIG.NUM_ORDENES));
   }
-
-  // Esperar a que todas terminen
-  await Promise.allSettled(promises);
 
   const totalTime = Date.now() - startTime;
 
