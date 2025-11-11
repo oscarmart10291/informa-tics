@@ -146,6 +146,28 @@ async function seedData() {
         data: { estado: 'DISPONIBLE' },
       });
       console.log(`   - ${mesasLiberadas.count} mesas liberadas`);
+
+      // Cerrar turnos de caja abiertos del cajero de prueba
+      const cajero = await prisma.usuario.findFirst({
+        where: { rol: { nombre: 'Cajero' } },
+        select: { id: true },
+      });
+
+      if (cajero) {
+        const turnosAbiertos = await prisma.cajaTurno.updateMany({
+          where: {
+            cajeroId: cajero.id,
+            estado: { in: ['PENDIENTE', 'ABIERTA'] },
+          },
+          data: {
+            estado: 'CERRADA',
+            cerradoEn: new Date(),
+          },
+        });
+        if (turnosAbiertos.count > 0) {
+          console.log(`   - ${turnosAbiertos.count} turnos de caja cerrados`);
+        }
+      }
     }
 
     // 3. Crear Categorías
@@ -222,20 +244,29 @@ async function seedData() {
     const turnoActivo = await prisma.cajaTurno.findFirst({
       where: {
         cajeroId: cajero.id,
-        cerradoEn: null,
+        estado: 'ABIERTA', // Buscar turno abierto
       },
     });
 
     if (!turnoActivo) {
+      // Buscar un admin para autorizar (puede ser el usuario admin)
+      const admin = await prisma.usuario.findFirst({
+        where: { rol: { nombre: 'Administrador' } },
+        select: { id: true },
+      });
+
       const nuevoTurno = await prisma.cajaTurno.create({
         data: {
           cajeroId: cajero.id,
           montoApertura: 100.00,
+          estado: 'ABIERTA', // Crear directamente como ABIERTA
+          autorizadoPorId: admin?.id, // Autorizado por admin
+          autorizadoEn: new Date(), // Fecha de autorización
         },
       });
-      console.log(`✅ Turno de caja creado (ID: ${nuevoTurno.id})`);
+      console.log(`✅ Turno de caja creado y autorizado (ID: ${nuevoTurno.id})`);
     } else {
-      console.log(`✅ Turno de caja activo (ID: ${turnoActivo.id})`);
+      console.log(`✅ Turno de caja abierto (ID: ${turnoActivo.id})`);
     }
 
     return {
