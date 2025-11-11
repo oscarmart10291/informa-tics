@@ -166,14 +166,33 @@ async function seedData() {
     if (CONFIG.AUTO_CLEAN) {
       console.log('🧹 Limpiando datos de pruebas anteriores...');
 
-      // Eliminar órdenes sin ticket (de pruebas)
-      const ordenesEliminadas = await prisma.orden.deleteMany({
+      // Primero, obtener IDs de órdenes a eliminar
+      const ordenesAEliminar = await prisma.orden.findMany({
         where: {
           mesero: { usuario: 'mesero1' },
           tickets: { none: {} },
         },
+        select: { id: true },
       });
-      console.log(`   - ${ordenesEliminadas.count} órdenes de prueba eliminadas`);
+
+      if (ordenesAEliminar.length > 0) {
+        const ordenesIds = ordenesAEliminar.map(o => o.id);
+
+        // Eliminar items de esas órdenes primero (por foreign key)
+        const itemsEliminados = await prisma.ordenItem.deleteMany({
+          where: { ordenId: { in: ordenesIds } },
+        });
+
+        // Ahora eliminar las órdenes
+        const ordenesEliminadas = await prisma.orden.deleteMany({
+          where: { id: { in: ordenesIds } },
+        });
+
+        console.log(`   - ${ordenesEliminadas.count} órdenes de prueba eliminadas`);
+        console.log(`   - ${itemsEliminados.count} items eliminados`);
+      } else {
+        console.log(`   - 0 órdenes de prueba para eliminar`);
+      }
 
       // Liberar todas las mesas ocupadas
       const mesasLiberadas = await prisma.mesa.updateMany({

@@ -35,16 +35,32 @@ async function cleanTestData() {
       return;
     }
 
-    // Eliminar órdenes del mesero de pruebas (los items se eliminan en cascada)
-    const resultado = await prisma.orden.deleteMany({
+    // Obtener IDs de órdenes a eliminar
+    const ordenesAEliminar = await prisma.orden.findMany({
       where: {
         meseroId: mesero.id,
         tickets: { none: {} }, // Solo elimina órdenes sin tickets (de pruebas)
       },
+      select: { id: true },
     });
 
-    console.log(`✅ Limpieza completada:`);
-    console.log(`   - ${resultado.count} órdenes eliminadas\n`);
+    if (ordenesAEliminar.length > 0) {
+      const ordenesIds = ordenesAEliminar.map(o => o.id);
+
+      // Eliminar items primero (por foreign key constraint)
+      const itemsEliminados = await prisma.ordenItem.deleteMany({
+        where: { ordenId: { in: ordenesIds } },
+      });
+
+      // Luego eliminar las órdenes
+      const ordenesEliminadas = await prisma.orden.deleteMany({
+        where: { id: { in: ordenesIds } },
+      });
+
+      console.log(`✅ Limpieza completada:`);
+      console.log(`   - ${ordenesEliminadas.count} órdenes eliminadas`);
+      console.log(`   - ${itemsEliminados.count} items eliminados\n`);
+    }
 
     // Liberar todas las mesas (volverlas a DISPONIBLE)
     const mesasLiberadas = await prisma.mesa.updateMany({
