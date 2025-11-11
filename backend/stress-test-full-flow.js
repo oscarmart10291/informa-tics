@@ -222,7 +222,7 @@ async function seedData() {
     const turnoActivo = await prisma.cajaTurno.findFirst({
       where: {
         cajeroId: cajero.id,
-        cierreAt: null,
+        cerradoEn: null,
       },
     });
 
@@ -230,7 +230,7 @@ async function seedData() {
       const nuevoTurno = await prisma.cajaTurno.create({
         data: {
           cajeroId: cajero.id,
-          montoCajaInicial: 100.00,
+          montoApertura: 100.00,
         },
       });
       console.log(`✅ Turno de caja creado (ID: ${nuevoTurno.id})`);
