@@ -1,0 +1,338 @@
+/* =============== BASE =============== */
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto','Oxygen',
+  'Ubuntu','Cantarell','Fira Sans','Droid Sans','Helvetica Neue',sans-serif;
+  background:#fafafa;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+code{font-family:source-code-pro,Menlo,Monaco,Consolas,'Courier New',monospace}
+
+:root{
+  --app-header-h:64px;
+  --pad:16px;
+  --content-max:1200px;
+}
+
+/* =============== LAYOUT GENERAL =============== */
+.cl-layout{
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:240px 1fr;
+  grid-template-rows:var(--app-header-h) 1fr;
+}
+@media (max-width:1024px){ .cl-layout{ grid-template-columns:1fr; } }
+
+.cl-main-header{
+  grid-column:2/3;
+  position:sticky; top:0; z-index:100;
+  height:var(--app-header-h);
+  background:#fff; border-bottom:1px solid #eee;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 12px;
+}
+@media (max-width:1024px){ .cl-main-header{ grid-column:1/-1; } }
+
+.cl-main{ grid-column:2/3; background:#faf7f3; padding:16px; }
+@media (max-width:1024px){ .cl-main{ grid-column:1/-1; } }
+
+/* =============== SIDEBAR =============== */
+.cl-side{
+  grid-row:1 / span 2;
+  background:linear-gradient(180deg,#8B0000,#A61B1B);
+  color:#fff; padding:18px;
+}
+@media (max-width:1024px){
+  .cl-side{
+    grid-row:auto; position:fixed; inset:0 auto 0 0; width:260px;
+    transform:translateX(-100%); transition:transform .2s ease;
+    z-index:10000; height:100vh; overflow-y:auto;
+  }
+  .cl-side.open{ transform:translateX(0); }
+  .cl-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:9999; }
+}
+
+/* =============== GRID 2→1 =============== */
+.grid-2-1{ display:grid; grid-template-columns:2fr 1fr; gap:18px; }
+@media (max-width:1024px){ .grid-2-1{ grid-template-columns:1fr; gap:12px; } }
+
+/* =============== SCROLLS =============== */
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.2); border-radius:8px; }
+::-webkit-scrollbar-thumb:hover{ background:rgba(0,0,0,.35); }
+
+/* =============== BOTONES / FILAS =============== */
+.btn-row{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+@media (max-width:480px){ .btn-row{ grid-template-columns:1fr; } }
+
+/* =============== CATEGORÍAS =============== */
+.cat-tabs{ display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; }
+.cat-tabs::-webkit-scrollbar{ height:6px; }
+
+/* =============== GRID DE PRODUCTOS (más columnas en pantallas grandes) =============== */
+.products-grid{
+  --min: 180px;                 /* ancho mínimo de cada tarjeta */
+  display:grid;
+  gap:14px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--min), 1fr));
+}
+@media (min-width: 640px){      /* mobile grande */
+  .products-grid{ --min: 200px; gap:16px; }
+}
+@media (min-width: 1024px){     /* laptop: más columnas / tarjetas más compactas */
+  .products-grid{ --min: 220px; }
+}
+@media (min-width: 1280px){     /* desktop ancho: aún más */
+  .products-grid{ --min: 240px; }
+}
+@media (min-width: 1536px){     /* 2K/ultrawide */
+  .products-grid{ --min: 260px; }
+}
+
+/* =============== MEDIA DEL PRODUCTO (altura contenida en desktop) =============== */
+.product-media{
+  width:100%;
+  aspect-ratio:3/2;             /* compacta en desktop/tablet */
+  background:#f2f2f2;
+  overflow:hidden;
+  border-top-left-radius:12px;
+  border-top-right-radius:12px;
+}
+.product-media img{
+  width:100%; height:100%;
+  object-fit:cover; display:block;
+}
+/* En móviles angostos mantenemos más altura para visual */
+@media (max-width:600px){ .product-media{ aspect-ratio:4/3; } }
+@media (max-width:400px){ .product-media{ aspect-ratio:1/1; } }
+
+/* =============== CARRITO DESKTOP =============== */
+@media (min-width:1025px){
+  .cart-sticky{ position:sticky; top:calc(var(--app-header-h) + 10px); }
+}
+
+/* =============== VISIBILIDAD SEGÚN DISPOSITIVO =============== */
+.hide-on-mobile{ display:block; }
+.show-on-mobile{ display:none; }
+@media (max-width:1024px){
+  .hide-on-mobile{ display:none !important; }
+  .show-on-mobile{ display:inline-flex !important; }
+  .cart-sticky{ display:none !important; }
+}
+
+/* =============== FAB (MÓVIL) =============== */
+.cart-fab{
+  position:fixed; right:14px; bottom:14px;
+  background:#111827; color:#fff; border:none; cursor:pointer;
+  padding:12px 16px; border-radius:999px; font-weight:800;
+  box-shadow:0 10px 24px rgba(0,0,0,.25);
+  z-index:10010; display:flex; align-items:center; gap:6px; font-size:15px;
+}
+.cart-fab:hover{ background:#000; }
+.cart-fab.hide{ display:none !important; }
+@media (min-width:1025px){ .cart-fab{ display:none; } }
+
+/* =============== DRAWER DEL CARRITO (MÓVIL) =============== */
+.cart-drawer-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:10005;
+}
+@media (min-width:1025px){ .cart-drawer-backdrop{ display:none; } }
+
+.cart-drawer{
+  position:fixed; top:0; right:0; bottom:0;
+  width:min(420px,92vw);
+  background:#f8fafc; border-left:1px solid #e5e7eb; z-index:10020;
+  transform:translateX(100%); transition:transform .22s ease;
+  display:flex; flex-direction:column;
+}
+.cart-drawer.open{ transform:translateX(0); }
+@media (min-width:1025px){ .cart-drawer{ display:none; } }
+
+.cart-drawer-header{
+  height:56px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 12px; background:#fff; border-bottom:1px solid #e5e7eb; font-weight:900;
+}
+.cart-drawer-close{
+  width:36px; height:36px; border-radius:10px; border:none; background:#f1f5f9;
+  font-weight:900; cursor:pointer;
+}
+.cart-drawer-body{ padding:12px; overflow-y:auto; }
+
+/* =============== MICRO-FIXES =============== */
+img,button,input,textarea{ max-width:100%; box-sizing:border-box; }
+/* NO limitamos el ancho de las tarjetas en desktop para que entren más columnas */
+@media (max-width:480px){
+  /* En móviles sí centramos y limitamos un poco la tarjeta */
+  section > article{ margin:0 auto; max-width:380px; }
+}
+/* ===== Helpers de visibilidad ===== */
+.only-mobile {
+  display: none !important;
+}
+.only-desktop {
+  display: block !important;
+}
+
+@media (max-width: 1024px) {
+  .only-mobile {
+    display: inline-flex !important;
+  }
+  .only-desktop {
+    display: none !important;
+  }
+}
+/* === Tabs de categorías: scroll horizontal en móvil/tablet === */
+.cat-tabs{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;          /* <- permite desplazamiento horizontal */
+  overflow-y:hidden;
+  padding:6px 2px;
+  -webkit-overflow-scrolling: touch;   /* inercia en iOS */
+  overscroll-behavior-x: contain;      /* evita arrastrar toda la página */
+  scrollbar-width: thin;               /* firefox */
+}
+.cat-tabs::-webkit-scrollbar{ height:6px; }    /* opcional: fino en webkit */
+.cat-tabs::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.2); border-radius:8px; }
+
+/* Los ítems no se encogen y se colocan en línea para poder hacer scroll */
+.cat-tabs > *{
+  flex: 0 0 auto;
+}
+
+/* Evita que el contenido empuje el layout y genere scroll horizontal global */
+html, body { max-width: 100%; overflow-x: hidden; }
+.cl-main .container, section { min-width: 0; }
+
+/* ===== Historial responsive tweaks ===== */
+
+/* Título fluido (no gigante en móvil) */
+.hist-title{
+  font-size: clamp(22px, 4.5vw, 34px);
+  line-height: 1.15;
+}
+
+/* Filtros: compactar en pantallas angostas */
+.orders-filters{
+  gap: 12px;
+}
+@media (max-width: 420px){
+  .orders-filters{
+    gap: 10px;
+    padding: 10px;
+  }
+  .orders-filters input,
+  .orders-filters select{
+    height: 40px;              /* antes 44 */
+    font-size: 14px;
+  }
+}
+
+/* Tarjeta del pedido: separar mejor en móvil */
+.order-card{ }
+.order-head{ }
+.order-actions{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;              /* permite saltar de línea si no caben */
+  white-space: normal;          /* deja que los botones encojan */
+}
+
+/* En móvil: acciones en grilla 2×2 (o 1×N si hay menos) y a 100% de ancho */
+@media (max-width: 600px){
+  .order-head{
+    align-items: flex-start;    /* fecha/estado arriba, botones abajo */
+    gap: 10px;
+  }
+  .order-actions{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  .order-actions > button{
+    width: 100%;
+    min-width: 0;               /* permite encoger el texto del botón */
+  }
+}
+
+/* Chips y filas: evitar desbordes */
+.order-card .chip-row,
+.order-card .meta-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Evitar scroll horizontal global en móvil por textos largos */
+html, body{ max-width:100%; overflow-x:hidden; }
+
+/* Acciones del pedido: layout responsivo */
+.order-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  white-space:normal;
+}
+
+/* Móvil: grilla 2×2 (auto-fit) y ancho completo de la tarjeta */
+@media (max-width: 600px){
+  .order-head{ 
+    align-items:flex-start;
+    gap:10px;
+  }
+  .order-actions{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    width:100%;
+    margin-top:8px;
+  }
+  .order-actions > button{
+    width:100%;
+    min-width:0;        /* evita “barras” larguísimas */
+    font-size:14px;
+    padding:10px 12px;
+  }
+}
+
+/* Desktop: el botón de imprimir puede tener un ancho mínimo cómodo */
+@media (min-width: 601px){
+  .order-actions .btn-print{
+    min-width:140px;
+  }
+}
+
+/* Evitar que el print tenga ancho fijo en móvil */
+.btn-print{ min-width: 140px; }
+@media (max-width: 600px){
+  .btn-print{ min-width: auto; }
+}
+
+/* En móvil: cabeza en columna y acciones a ancho completo */
+@media (max-width: 600px){
+  .order-card{ padding: 12px; }
+  .order-head{
+    flex-direction: column;
+    align-items: stretch;   /* que el bloque de acciones ocupe todo */
+    gap: 10px;
+  }
+  .order-actions{
+    margin-top: 6px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: 8px;
+  }
+  .order-actions > button{
+    width: 100%;
+    min-width: 0;           /* por si algún inline se coló */
+    font-size: 14px;
+    padding: 10px 12px;
+  }
+}
+
+/* Por si acaso, nunca permitir overflow horizontal */
+html, body { max-width: 100%; overflow-x: hidden; }

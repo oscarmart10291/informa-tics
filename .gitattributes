@@ -1,0 +1,10 @@
+# Normaliza a LF en el repo
+* text=auto eol=lf
+
+# Mantén binarios intactos
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.ico binary

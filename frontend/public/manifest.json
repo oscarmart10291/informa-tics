@@ -1,0 +1,25 @@
+{
+  "short_name": "RestAdmin",
+  "name": "Restaurante - Panel Admin",
+  "icons": [
+    {
+      "src": "favicon-admin.ico?v=1",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "icon-admin-192.png?v=1",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-admin-512.png?v=1",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}

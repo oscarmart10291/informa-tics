@@ -1,0 +1,741 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")  // pool (PgBouncer) -> para la app
+  directUrl = env("DIRECT_URL")    // directa -> para migraciones Prisma
+}
+
+/**
+ * =========================
+ * MODELOS DE USUARIO/ROLES
+ * =========================
+ */
+
+model Usuario {
+  id            Int      @id @default(autoincrement())
+  nombre        String
+  usuario       String   @unique
+  correo        String   @unique
+  contrasena    String?
+  estado        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  debeCambiarPassword Boolean @default(false)
+
+  rolId Int
+  rol   Rol @relation(fields: [rolId], references: [id])
+
+  /// 🔸 Permisos directos (además de los del rol)
+  permisos PermisoUsuario[]
+
+  historialModificaciones HistorialModificacion[] @relation("ModificacionesDelUsuario")
+  historialResponsable    HistorialModificacion[] @relation("ModificacionesHechasPor")
+
+  // Historial de contraseñas (para bloquear reutilización)
+  passwordHistory PasswordHistory[]
+
+  // Órdenes donde este usuario actúa como mesero
+  ordenesMesero Orden[] @relation("OrdenesDelMesero")
+
+  // Ítems asignados como chef (cocina)
+  itemsAsignados OrdenItem[] @relation("AsignadoAlChef")
+
+  // Estado de actividad en cocina (1:1 opcional)
+  cocinaEstado CocinaChef?
+
+  // Barra/Bartender
+  itemsBarraAsignados OrdenItem[]     @relation("AsignadoAlBartender")
+  barraEstado         BarraBartender?
+
+  // Egresos de caja
+  egresosSolicitados EgresoCaja[] @relation("EgresosSolicitadosPor")
+  egresosAutorizados EgresoCaja[] @relation("EgresosAutorizadosPor")
+
+  // Notificaciones a mesero
+  meseroNotifs MeseroNotif[]
+
+  // 🚚 Pedidos donde este usuario actúa como repartidor
+  pedidosRepartidor PedidoCliente[] @relation("PedidosAsignadosRepartidor")
+
+  // Observaciones de reparto hechas por este usuario
+  observacionesEntrega ObservacionEntrega[]
+
+  // 🔔 Notificaciones para repartidor (opcional, útil para consultas desde usuario)
+  repartidorNotifs RepartidorNotif[]
+
+  // Tickets cobrados por este usuario (cajero)
+  ticketsCobrados TicketVenta[] @relation("TicketsCobradosPor")
+
+  // Tickets anulados por este usuario
+  ticketsAnulados TicketVenta[] @relation("TicketsAnuladosPor")
+
+  // Turnos de caja solicitados por este usuario (cajero)
+  cajaTurnosSolicitados CajaTurno[] @relation("CajaTurnosDelCajero")
+
+  // Turnos de caja autorizados por este usuario (admin)
+  cajaTurnosAutorizados CajaTurno[] @relation("CajaTurnosAutorizadosPor")
+}
+
+model Rol {
+  id       Int             @id @default(autoincrement())
+  nombre   String          @unique
+  usuarios Usuario[]
+  permisos PermisoPorRol[]
+}
+
+model Permiso {
+  id          Int             @id @default(autoincrement())
+  nombre      String          @unique
+  descripcion String?
+  roles       PermisoPorRol[]
+
+  /// 🔸 Usuarios con permisos directos
+  usuarios PermisoUsuario[]
+}
+
+model PermisoPorRol {
+  id        Int     @id @default(autoincrement())
+  permisoId Int
+  rolId     Int
+  permiso   Permiso @relation(fields: [permisoId], references: [id])
+  rol       Rol     @relation(fields: [rolId], references: [id])
+
+  @@unique([permisoId, rolId])
+}
+
+/// 🔸 NUEVO: join table para permisos directos por usuario
+model PermisoUsuario {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  permisoId Int
+
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  permiso   Permiso  @relation(fields: [permisoId], references: [id])
+
+  @@unique([usuarioId, permisoId])
+}
+
+/**
+ * =========================
+ * PASSWORD HISTORY
+ * =========================
+ */
+model PasswordHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      Usuario  @relation(fields: [userId], references: [id])
+  hash      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/**
+ * =========================
+ * CATÁLOGO
+ * =========================
+ */
+
+enum CategoriaTipo {
+  COMESTIBLE
+  BEBIBLE
+}
+
+model Categoria {
+  id        Int        @id @default(autoincrement())
+  nombre    String     @unique
+  activo    Boolean    @default(true)
+  creadoEn  DateTime   @default(now())
+  platillos Platillo[]
+
+  tipo CategoriaTipo @default(COMESTIBLE)
+}
+
+model Platillo {
+  id         Int      @id @default(autoincrement())
+  nombre     String   @unique
+  precio     Float
+  creadoEn   DateTime @default(now())
+  disponible Boolean  @default(true)
+  imagenUrl  String?
+
+  categoriaId Int
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+
+  historialModificaciones HistorialModificacion[]
+}
+
+/**
+ * =========================
+ * HISTORIAL
+ * =========================
+ */
+
+model HistorialModificacion {
+  id            Int      @id @default(autoincrement())
+  campo         String
+  valorAnterior String?
+  valorNuevo    String?
+  fecha         DateTime @default(now())
+  accion        String
+
+  responsableId Int
+  responsable   Usuario @relation("ModificacionesHechasPor", fields: [responsableId], references: [id])
+
+  usuarioId Int?
+  usuario   Usuario? @relation("ModificacionesDelUsuario", fields: [usuarioId], references: [id])
+
+  platilloId Int?
+  platillo   Platillo? @relation(fields: [platilloId], references: [id])
+}
+
+/**
+ * =========================
+ * MESAS
+ * =========================
+ */
+
+enum MesaEstado {
+  DISPONIBLE
+  OCUPADA
+  RESERVADA
+}
+
+model Mesa {
+  id            Int        @id @default(autoincrement())
+  numero        Int        @unique
+  capacidad     Int
+  estado        MesaEstado @default(DISPONIBLE)
+  reservadaPor  String?
+  activa        Boolean    @default(true)
+  creadoEn      DateTime   @default(now())
+  actualizadoEn DateTime   @updatedAt
+
+  reservas Reserva[]
+
+  @@index([activa])
+}
+
+/**
+ * =========================
+ * RESERVAS
+ * =========================
+ */
+
+enum ReservaEstado {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+  CUMPLIDA
+}
+
+enum PagoEstado {
+  PENDIENTE
+  PAGADO
+  FALLIDO
+}
+
+enum RefundEstado {
+  NO_APLICA
+  PENDIENTE
+  PROCESADO
+  RECHAZADO
+}
+
+model Reserva {
+  id     Int  @id @default(autoincrement())
+  mesaId Int
+  mesa   Mesa @relation(fields: [mesaId], references: [id])
+
+  fechaHora DateTime
+  hastaHora DateTime
+
+  nombre         String
+  telefono       String        @db.VarChar(8)
+  email          String
+  nota           String?
+  monto          Decimal       @default(50.00)
+  estado         ReservaEstado @default(PENDIENTE)
+  pagoEstado     PagoEstado    @default(PENDIENTE)
+  pagoMetodo     String        @default("TARJETA")
+  pagoReferencia String?
+  pagadoEn       DateTime?
+  canceladaEn    DateTime?
+
+  refundEstado RefundEstado @default(NO_APLICA)
+  refundMonto  Decimal?
+  refundEn     DateTime?
+  refundMotivo String?
+
+  verificadaPorMeseroId Int?
+  verificadaEn          DateTime?
+
+  aplicadoEnOrdenId Int?
+  aplicadoEnPagoId  Int?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([mesaId, fechaHora, hastaHora])
+  @@index([estado, pagoEstado])
+}
+
+/**
+ * =========================
+ * CAJA (Estados y métodos)
+ * =========================
+ */
+
+enum OrdenEstado {
+  EN_ESPERA
+  EN_PREPARACION
+  TERMINADA
+  PENDIENTE_PAGO
+  PAGADA
+  CANCELADA
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TARJETA
+}
+
+enum EgresoEstado {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+/**
+ * =========================
+ * ORDEN / DETALLE
+ * =========================
+ */
+
+model Orden {
+  id     Int    @id @default(autoincrement())
+  codigo String @unique @default(dbgenerated("upper(substr(md5(random()::text),1,5))")) @db.VarChar(5)
+
+  mesa        Int
+  fecha       DateTime  @default(now())
+  finishedAt  DateTime?
+  durationSec Int?
+
+  meseroId Int?
+  mesero   Usuario? @relation("OrdenesDelMesero", fields: [meseroId], references: [id])
+
+  items OrdenItem[]
+
+  estado OrdenEstado @default(EN_ESPERA)
+
+  totalPagado Float?
+
+  // Relación 1:N con tickets (pagos parciales)
+  tickets TicketVenta[]
+
+  // (Opcional) Anticipo cargado a la orden
+  anticipo Float @default(0)
+
+  // Relación 1:1 con PedidoCliente (si aplica)
+  pedidoCliente PedidoCliente? @relation("PedidoClienteOrden")
+
+  notifs MeseroNotif[]
+
+  @@index([fecha])
+  @@index([finishedAt])
+  @@index([estado])
+}
+
+model OrdenItem {
+  id           Int      @id @default(autoincrement())
+  nombre       String
+  precio       Float
+  nota         String?
+
+  // "PLATILLO" | "BEBIDA"
+  tipo         String
+  // "PENDIENTE" | "ASIGNADO" | "PREPARANDO" | "LISTO" (o los que uses)
+  estado       String
+
+  // Reporterías
+  qty          Int      @default(1)
+  subtotal     Float?
+
+  // Tiempos
+  creadoEn     DateTime @default(now())
+  asignadoEn   DateTime?
+  preparandoEn DateTime?
+  finalizadoEn DateTime?
+  prioridad    Int?
+
+  // Marca si el ítem ya fue cobrado
+  pagado       Boolean  @default(false)
+
+  // Relaciones
+  ordenId      Int
+  orden        Orden     @relation(fields: [ordenId], references: [id])
+
+  // Cocina
+  chefId       Int?
+  chef         Usuario?  @relation("AsignadoAlChef", fields: [chefId], references: [id])
+
+  // Barra
+  bartenderId  Int?
+  bartender    Usuario?  @relation("AsignadoAlBartender", fields: [bartenderId], references: [id])
+
+  // NUEVO: ticket que cobró este ítem (pagos parciales)
+  ticketVentaId Int?
+  ticket        TicketVenta? @relation(fields: [ticketVentaId], references: [id])
+
+  // Índices
+  @@index([ordenId, tipo, estado])
+  @@index([chefId, estado])
+  @@index([bartenderId, estado])
+  @@index([preparandoEn])
+  @@index([pagado])
+}
+
+/**
+ * =========================
+ * COCINA / BARRA
+ * =========================
+ */
+
+model CocinaChef {
+  id       Int      @id @default(autoincrement())
+  chefId   Int      @unique
+  chef     Usuario  @relation(fields: [chefId], references: [id])
+  activo   Boolean  @default(true)
+  lastSeen DateTime @default(now())
+}
+
+model BarraBartender {
+  id          Int      @id @default(autoincrement())
+  bartenderId Int      @unique
+  bartender   Usuario  @relation(fields: [bartenderId], references: [id])
+  activo      Boolean  @default(true)
+  lastSeen    DateTime @default(now())
+}
+
+/**
+ * =========================
+ * TICKET / EGRESOS
+ * =========================
+ */
+
+enum ComprobanteEstado {
+  VALIDO
+  ANULADO
+}
+
+model TicketVenta {
+  id Int @id @default(autoincrement())
+
+  // ⚠️ Permitir varios tickets por orden (sin unique)
+  ordenId Int
+  orden   Orden @relation(fields: [ordenId], references: [id])
+
+  // Quién cobró
+  cajeroId Int?
+  cajero   Usuario? @relation("TicketsCobradosPor", fields: [cajeroId], references: [id])
+
+  fechaPago  DateTime   @default(now())
+  metodoPago MetodoPago
+
+  // Montos
+  subtotal         Float @default(0)
+  impuestos        Float @default(0)
+  descuentos       Float @default(0)
+  totalAPagar      Float
+  montoRecibido    Float
+  cambio           Float
+  anticipoAplicado Float @default(0)
+  propina          Float @default(0) // ✅ NUEVO
+
+  // Datos de comprobante
+  serie         String?
+  numero        String?
+  clienteNombre String?
+  clienteNit    String?
+  snapshot      Json?
+
+  // Estado del comprobante
+  estado        ComprobanteEstado @default(VALIDO)
+  anuladoEn     DateTime?
+  anuladoPorId  Int?
+  anuladoPor    Usuario?          @relation("TicketsAnuladosPor", fields: [anuladoPorId], references: [id])
+  anuladoMotivo String?
+
+  posCorrelativo String?
+
+  // Relación inversa: ítems cobrados por este ticket
+  items OrdenItem[]
+
+  @@index([fechaPago])
+  @@index([metodoPago, fechaPago])
+  @@index([estado, fechaPago])
+  @@index([cajeroId, fechaPago])
+}
+
+model EgresoCaja {
+  id       Int          @id @default(autoincrement())
+  creadoEn DateTime     @default(now())
+  estado   EgresoEstado @default(PENDIENTE)
+
+  cajeroId Int
+  cajero   Usuario @relation("EgresosSolicitadosPor", fields: [cajeroId], references: [id])
+
+  monto  Float
+  motivo String
+
+  autorizadoPorId Int?
+  autorizadoPor   Usuario?  @relation("EgresosAutorizadosPor", fields: [autorizadoPorId], references: [id])
+  autorizadoEn    DateTime?
+  observacion     String?
+
+  @@index([creadoEn])
+  @@index([estado])
+  @@index([cajeroId])
+  @@index([autorizadoPorId])
+}
+
+/**
+ * =========================
+ * PEDIDOS DEL CLIENTE (web)
+ * =========================
+ */
+
+enum TipoEntrega {
+  LOCAL
+  DOMICILIO
+}
+
+enum DeliveryStatus {
+  PEND_PREPARACION
+  EN_PREPARACION
+  LISTO_PARA_ENTREGA
+  LISTO_PARA_RECOGER
+  ASIGNADO_A_REPARTIDOR
+  EN_CAMINO
+  ENTREGADO
+  CANCELADO
+}
+
+model PedidoCliente {
+  id           Int      @id @default(autoincrement())
+  codigo       String   @unique @default(dbgenerated("upper(substr(md5(random()::text),1,5))")) @db.VarChar(5)
+  clienteEmail String
+  creadoEn     DateTime @default(now())
+
+  // estado general previo
+  estado String @default("PENDIENTE")
+
+  // Reparto
+  repartidorId Int?
+  repartidor   Usuario? @relation(name: "PedidosAsignadosRepartidor", fields: [repartidorId], references: [id])
+
+  tipoEntrega    TipoEntrega
+  metodoPago     String
+  direccion      String?
+  telefono       String?
+  receptorNombre String?
+
+  // Estado específico de reparto
+  deliveryStatus DeliveryStatus @default(PEND_PREPARACION)
+  readyAt        DateTime?
+  assignedAt     DateTime?
+  startedAt      DateTime?
+  deliveredAt    DateTime?
+
+  total Float @default(0)
+
+  // Relación 1:1 con Orden
+  ordenId Int?   @unique
+  calificacion CalificacionPedido?   // 👈 NUEVO
+  orden   Orden? @relation("PedidoClienteOrden", fields: [ordenId], references: [id])
+
+  items         PedidoClienteItem[]
+  observaciones ObservacionEntrega[]
+
+  // Notificaciones repartidor
+  repartidorNotifs RepartidorNotif[] @relation("Pedido_RepartidorNotif")
+
+  @@index([repartidorId, deliveryStatus])
+  @@index([deliveryStatus, readyAt])
+  @@index([clienteEmail, creadoEn])
+  @@index([ordenId])
+}
+
+model ObservacionEntrega {
+  id       Int           @id @default(autoincrement())
+  pedidoId Int
+  pedido   PedidoCliente @relation(fields: [pedidoId], references: [id])
+
+  repartidorId Int
+  repartidor   Usuario @relation(fields: [repartidorId], references: [id])
+
+  texto     String
+  createdAt DateTime @default(now())
+
+  @@index([pedidoId, createdAt])
+  @@index([repartidorId, createdAt])
+}
+
+model PedidoClienteItem {
+  id         Int     @id @default(autoincrement())
+  pedidoId   Int
+  platilloId Int
+  nombre     String
+  precio     Float
+  qty        Int     @default(1)
+  nota       String?
+
+  pedido PedidoCliente @relation(fields: [pedidoId], references: [id])
+}
+
+/**
+ * =========================
+ * NOTIFICACIONES MESERO
+ * =========================
+ */
+
+model MeseroNotif {
+  id       Int      @id @default(autoincrement())
+  creadoEn DateTime @default(now())
+  visto    Boolean  @default(false)
+
+  ordenId Int
+  orden   Orden @relation(fields: [ordenId], references: [id])
+
+  itemNombre String
+  tipo       String // "PLATILLO" | "BEBIDA"
+
+  meseroId Int?
+  mesero   Usuario? @relation(fields: [meseroId], references: [id])
+
+  @@index([meseroId, visto, creadoEn])
+  @@index([ordenId, creadoEn])
+}
+
+/**
+ * =========================
+ * NOTIFICACIONES REPARTIDOR
+ * =========================
+ */
+
+model RepartidorNotif {
+  id       Int      @id @default(autoincrement())
+  creadoEn DateTime @default(now())
+  visto    Boolean  @default(false)
+
+  // Tipo lógico estable de la notificación
+  tipo   String  @default("GENERICA")
+  titulo String
+  cuerpo String?
+
+  // null = broadcast a todos los repartidores
+  repartidorId Int?
+  repartidor   Usuario? @relation(fields: [repartidorId], references: [id])
+
+  // Relación al pedido del cliente
+  pedidoId Int?
+  pedido   PedidoCliente? @relation("Pedido_RepartidorNotif", fields: [pedidoId], references: [id])
+
+  // Evita duplicados dirigidos
+  @@unique([pedidoId, repartidorId, tipo], map: "uniq_notif_by_user")
+  // Evita duplicados broadcast
+  @@unique([pedidoId, tipo], map: "uniq_notif_broadcast")
+  @@index([repartidorId, visto, creadoEn])
+  @@index([pedidoId, creadoEn])
+}
+
+/**
+ * =========================
+ * TURNOS DE CAJA
+ * =========================
+ */
+
+enum CajaTurnoEstado {
+  PENDIENTE   // solicitud de apertura creada por cajero
+  ABIERTA     // apertura autorizada y activa
+  RECHAZADA   // apertura rechazada
+  CIERRE_PENDIENTE // cierre solicitado por cajero, pendiente de autorización
+  CERRADA     // cierre confirmado por admin
+}
+
+model CajaTurno {
+  id              Int             @id @default(autoincrement())
+
+  // Cajero que solicita/apertura
+  cajeroId        Int
+  cajero          Usuario         @relation("CajaTurnosDelCajero", fields: [cajeroId], references: [id])
+
+  // Estado del turno
+  estado          CajaTurnoEstado @default(PENDIENTE)
+
+  // APERTURA
+  montoApertura   Float           @default(0)
+  conteoInicial   Json?
+  solicitadoEn    DateTime        @default(now())
+  autorizadoPorId Int?
+  autorizadoPor   Usuario?        @relation("CajaTurnosAutorizadosPor", fields: [autorizadoPorId], references: [id])
+  autorizadoEn    DateTime?
+
+  // CIERRE (por solicitud del cajero, se autoriza por admin)
+  montoCierre        Float?
+  conteoFinal        Json?
+  cierreSolicitadoEn DateTime?
+  cierreAutorizadoPorId Int?
+  cierreAutorizadoEn DateTime?
+
+  // Marca de tiempo final
+  cerradoEn       DateTime?
+
+  @@index([cajeroId, estado])
+  @@index([estado, solicitadoEn])
+  @@index([autorizadoPorId])
+}
+
+/**
+ * =========================
+ * CALIFICACIONES
+ * =========================
+ */
+
+model CalificacionPedido {
+  id               Int           @id @default(autoincrement())
+  pedidoId         Int           @unique
+  pedido           PedidoCliente @relation(fields: [pedidoId], references: [id])
+
+  comida           Int
+  repartidor       Int?
+  atencionCliente  Int?
+  comentario       String?
+
+  // opciones predefinidas seleccionadas (checkboxes)
+  comidaOpciones      Json?
+  repartidorOpciones  Json?
+  atencionOpciones    Json?
+
+  creadoEn         DateTime      @default(now())
+  actualizadoEn    DateTime      @updatedAt
+}
+
+/**
+ * =========================
+ * SETTINGS (Propina, etc.)
+ * =========================
+ */
+
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
