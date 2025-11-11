@@ -178,18 +178,27 @@ async function seedData() {
       if (ordenesAEliminar.length > 0) {
         const ordenesIds = ordenesAEliminar.map(o => o.id);
 
-        // Eliminar items de esas órdenes primero (por foreign key)
+        // Eliminar dependencias en orden correcto (foreign key constraints)
+        // 1. Notificaciones de mesero
+        const notifsEliminadas = await prisma.meseroNotif.deleteMany({
+          where: { ordenId: { in: ordenesIds } },
+        });
+
+        // 2. Items de órdenes
         const itemsEliminados = await prisma.ordenItem.deleteMany({
           where: { ordenId: { in: ordenesIds } },
         });
 
-        // Ahora eliminar las órdenes
+        // 3. Órdenes
         const ordenesEliminadas = await prisma.orden.deleteMany({
           where: { id: { in: ordenesIds } },
         });
 
         console.log(`   - ${ordenesEliminadas.count} órdenes de prueba eliminadas`);
         console.log(`   - ${itemsEliminados.count} items eliminados`);
+        if (notifsEliminadas.count > 0) {
+          console.log(`   - ${notifsEliminadas.count} notificaciones eliminadas`);
+        }
       } else {
         console.log(`   - 0 órdenes de prueba para eliminar`);
       }
