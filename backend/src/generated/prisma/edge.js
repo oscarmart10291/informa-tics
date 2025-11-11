@@ -533,7 +533,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/Users/agivasa/Downloads/informa-tics-main/backend/src/generated/prisma",
+      "value": "/home/user/informa-tics/backend/src/generated/prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -542,17 +542,16 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "darwin-arm64",
+        "value": "debian-openssl-3.0.x",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/agivasa/Downloads/informa-tics-main/backend/prisma/schema.prisma",
+    "sourceFilePath": "/home/user/informa-tics/backend/prisma/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
-    "rootEnvPath": null,
-    "schemaEnvPath": "../../../.env"
+    "rootEnvPath": null
   },
   "relativePath": "../../../prisma",
   "clientVersion": "6.19.0",
@@ -561,7 +560,7 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
-  "postinstall": false,
+  "postinstall": true,
   "inlineDatasources": {
     "db": {
       "url": {
